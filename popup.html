@@ -82,6 +82,41 @@
       .switch input:checked + .slider:before {
         transform: translateX(18px);
       }
+
+      .button-container {
+        padding-top: 14px;
+        display: flex;
+        gap: 1rem;
+      }
+
+      button {
+        width: 100%;
+        padding: 10px 0;
+        font-size: 14px;
+        font-weight: 600;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        transition: opacity 0.15s;
+      }
+
+      #active-all-btn {
+        background: #ff7200;
+        color: #fff;
+      }
+
+      #active-all-btn:hover {
+        opacity: 0.85;
+      }
+
+      #deactive-all-btn {
+        background: #ddd;
+        color: #000;
+      }
+
+      #deactive-all-btn:hover {
+        opacity: 0.85;
+      }
     </style>
   </head>
 
@@ -128,8 +163,11 @@
           <span class="slider"></span>
         </label>
       </div>
+      <div class="button-container">
+        <button id="active-all-btn">전체 활성화</button>
+        <button id="deactive-all-btn">전체 비활성화</button>
+      </div>
     </div>
-
     <script src="popup.js"></script>
   </body>
 </html>

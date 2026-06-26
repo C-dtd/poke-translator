@@ -124,7 +124,6 @@ function main(replacements, regex) {
 }
 
 async function revert(enabledCategories) {
-  console.log(enabledCategories);
   function replaceInTextNode(node) {
     if (!enabledCategories[node.dataset.category]) node.replaceWith(node.title);
   }
@@ -152,6 +151,7 @@ chrome.storage.onChanged.addListener(async (c) => {
   if (!c.enabledCategories) return;
   observer.disconnect();
   const { enabledCategories, replacements, regex } = await fetchConfigs();
+  console.log(enabledCategories);
   revert(enabledCategories);
   observer = main(replacements, regex);
 });
