@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "로토무 번역기",
+  "version": "1.0",
+  "description": "포켓몬스터의 영문 버전 포켓몬 이름, 특성, 기술, 도구, 성격을 공식 번역된 단어로 바꾸는 크롬 확장프로그램입니다",
+  "permissions": ["storage"],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["pokedex.json", "items.json", "moves.json", "natures.json", "abilities.json"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
