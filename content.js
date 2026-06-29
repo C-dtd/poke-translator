@@ -12,8 +12,11 @@ function buildTrieRegex(keys) {
   function trieToPattern(node) {
     const parts = [];
 
-    for (const [char, child] of Object.entries(node)) {
-      if (char === "$") continue;
+    const entries = Object.entries(node)
+      .filter(([char]) => char !== "$")
+      .sort(([, a], [, b]) => depth(b) - depth(a));
+
+    for (const [char, child] of entries) {
       const escaped = char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const sub = trieToPattern(child);
       parts.push(sub ? `${escaped}(?:${sub})` : escaped);
@@ -25,6 +28,11 @@ function buildTrieRegex(keys) {
     return node.$ ? `(?:${pattern})?` : pattern;
   }
 
+  function depth(node) {
+    const children = Object.entries(node).filter(([k]) => k !== "$");
+    if (children.length === 0) return 0;
+    return 1 + Math.max(...children.map(([, child]) => depth(child)));
+  }
   return new RegExp(`\\b(?:${trieToPattern(trie)})\\b`, "gi");
 }
 const categoryFiles = {
@@ -34,18 +42,19 @@ const categoryFiles = {
   items: "items.json",
   natures: "natures.json",
 };
+const defaultEnabledCategories = { pokedex: true, moves: true, abilities: true, items: true, natures: true };
 
 let observer;
+let isActivated;
 
 async function init() {
-  const { enabledCategories, replacements, regex } = await fetchConfigs();
-  observer = main(replacements, regex);
+  const { enabledCategories: stored = {} } = await chrome.storage.sync.get("enabledCategories");
+  const enabledCategories = { ...defaultEnabledCategories, ...stored };
+  const { wordDict, regex } = await fetchConfigs(enabledCategories);
+  observer = main(wordDict, regex);
 }
 
-async function fetchConfigs() {
-  const { enabledCategories = { pokedex: true, moves: true, abilities: true, items: true, natures: true } } =
-    await chrome.storage.sync.get("enabledCategories");
-
+async function fetchConfigs(enabledCategories) {
   const entries = await Promise.all(
     Object.entries(categoryFiles)
       .filter(([k, v]) => enabledCategories[k])
@@ -56,23 +65,23 @@ async function fetchConfigs() {
       }),
   );
 
-  const replacements = new Map();
-
+  const wordDict = new Map();
   for (const { category, data } of entries) {
     for (const [k, v] of Object.entries(data)) {
-      replacements.set(k.toLowerCase(), { text: v, category: category });
+      wordDict.set(k.toLowerCase(), { text: v, category: category });
     }
   }
-  const regex = buildTrieRegex(replacements.keys());
-  return { enabledCategories, replacements, regex };
+
+  const regex = buildTrieRegex(wordDict.keys());
+  return { wordDict, regex };
 }
 
-function main(replacements, regex) {
+function main(wordDict, regex) {
   function replaceInTextNode(node) {
     if (node.parentElement?.classList.contains("poke-translator")) return;
     const text = node.textContent;
     const html = text.replace(regex, (m) => {
-      const translated = replacements.get(m.toLowerCase());
+      const translated = wordDict.get(m.toLowerCase());
       if (!translated) return m;
       return `<span class="poke-translator" data-category="${translated.category}" title="${m}">${translated.text}</span>`;
     });
@@ -103,6 +112,7 @@ function main(replacements, regex) {
   }
 
   const observer = new MutationObserver((mutations) => {
+    if (!isActivated) return;
     for (const mutation of mutations) {
       for (const added of mutation.addedNodes) {
         if (added.nodeType === Node.TEXT_NODE) {
@@ -125,7 +135,11 @@ function main(replacements, regex) {
 
 async function revert(enabledCategories) {
   function replaceInTextNode(node) {
-    if (!enabledCategories[node.dataset.category]) node.replaceWith(node.title);
+    if (!enabledCategories[node.dataset.category]) {
+      const parent = node.parentNode;
+      node.replaceWith(node.title);
+      parent.normalize();
+    }
   }
 
   function acceptNode(node) {
@@ -143,15 +157,38 @@ async function revert(enabledCategories) {
   for (const n of nodes) {
     replaceInTextNode(n);
   }
+
+  document.body.normalize();
 }
 
-init();
+chrome.storage.sync.get(["sitelist"], ({ sitelist = [] }) => {
+  if (!sitelist.includes(location.hostname)) {
+    isActivated = false;
+    return;
+  }
+  isActivated = true;
+  init();
+});
 
 chrome.storage.onChanged.addListener(async (c) => {
-  if (!c.enabledCategories) return;
-  observer.disconnect();
-  const { enabledCategories, replacements, regex } = await fetchConfigs();
-  console.log(enabledCategories);
-  revert(enabledCategories);
-  observer = main(replacements, regex);
+  if (!c.enabledCategories && !c.sitelist) return;
+
+  if (isActivated && c.enabledCategories && observer) {
+    observer.disconnect();
+    const enabledCategories = { ...defaultEnabledCategories, ...c.enabledCategories.newValue };
+    const { wordDict, regex } = await fetchConfigs(enabledCategories);
+    revert(enabledCategories);
+    observer = main(wordDict, regex);
+  }
+
+  if (c.sitelist.newValue.includes(location.hostname) && !c.sitelist.oldValue.includes(location.hostname)) {
+    isActivated = true;
+    init();
+  }
+
+  if (!c.sitelist.newValue.includes(location.hostname) && c.sitelist.oldValue.includes(location.hostname)) {
+    isActivated = false;
+    observer.disconnect();
+    revert({ pokedex: false, moves: false, abilities: false, items: false, natures: false });
+  }
 });
