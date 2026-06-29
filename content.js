@@ -33,8 +33,50 @@ function buildTrieRegex(keys) {
     if (children.length === 0) return 0;
     return 1 + Math.max(...children.map(([, child]) => depth(child)));
   }
-  return new RegExp(`\\b(?:${trieToPattern(trie)})\\b`, "gi");
+
+  return new RegExp(`(?<![\\w\\p{L}])(?:${trieToPattern(trie)})(?![\\w\\p{L}])`, "giu");
 }
+// function buildTrieRegex(keys) {
+//   const trie = {};
+//   for (const key of keys) {
+//     let node = trie;
+//     for (const char of key.toLowerCase()) {
+//       node[char] ??= {};
+//       node = node[char];
+//     }
+//     node.$ = true;
+//   }
+
+//   function trieToPattern(node) {
+//     const parts = [];
+
+//     const entries = Object.entries(node)
+//       .filter(([char]) => char !== "$")
+//       .sort(([, a], [, b]) => depth(b) - depth(a));
+
+//     for (const [char, child] of entries) {
+//       const escaped = char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+//       const sub = trieToPattern(child);
+//       parts.push(sub ? `${escaped}(?:${sub})` : escaped);
+//     }
+
+//     if (parts.length === 0) return "";
+
+//     const pattern = parts.length === 1 ? parts[0] : parts.join("|");
+//     return node.$ ? `(?:${pattern})?` : pattern;
+//   }
+
+//   function depth(node) {
+//     const children = Object.entries(node).filter(([k]) => k !== "$");
+//     if (children.length === 0) return 0;
+//     return 1 + Math.max(...children.map(([, child]) => depth(child)));
+//   }
+
+//   const asciiKeys = keys.filter((k) => /^[\x00-\x7F]+$/.test(k));
+//   const unicodeKeys = keys.filter((k) => !/^[\x00-\x7F]+$/.test(k));
+
+//   return new RegExp(`\\b(?:${trieToPattern(trie)})\\b`, "gi");
+// }
 const categoryFiles = {
   pokedex: "pokedex.json",
   moves: "moves.json",
